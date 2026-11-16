@@ -1,0 +1,439 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FormReady — On-Device MediaPipe Face Landmarker Benchmark</title>
+  <meta name="description" content="Local on-device inference latency benchmark for Google MediaPipe Face Landmarker. Evaluates client-side execution for FormReady's biometric compliance engine.">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    .glow-green {
+      box-shadow: 0 0 25px rgba(16, 185, 129, 0.35);
+    }
+  </style>
+</head>
+<body class="bg-slate-900 text-slate-100 min-h-screen flex flex-col font-sans antialiased">
+
+  <!-- Header -->
+  <header class="bg-slate-950 border-b border-slate-800 py-4 px-4 sm:px-6">
+    <div class="max-w-4xl mx-auto flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <div class="w-9 h-9 rounded bg-emerald-600 text-slate-950 flex items-center justify-center font-black text-lg shadow-sm">
+          CV
+        </div>
+        <div>
+          <h1 class="font-bold text-base sm:text-lg text-white tracking-tight flex items-center gap-2">
+            FormReady
+            <span class="text-[10px] font-semibold bg-emerald-950 text-emerald-400 border border-emerald-800 px-1.5 py-0.5 rounded uppercase">
+              Gate 2 Benchmark
+            </span>
+          </h1>
+          <p class="text-xs text-slate-400">MediaPipe Face Landmarker • Client-Side WASM Latency</p>
+        </div>
+      </div>
+      <div id="engine-status-badge" class="flex items-center gap-2 text-xs font-medium px-3 py-1.5 rounded-full bg-amber-950/60 border border-amber-700/60 text-amber-300">
+        <span class="w-2 h-2 rounded-full bg-amber-400 animate-pulse"></span>
+        <span id="engine-status-text">Initializing WASM...</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Content -->
+  <main class="flex-grow max-w-4xl mx-auto px-4 py-6 sm:py-8 w-full space-y-6">
+
+    <!-- PROMINENT LATENCY DISPLAY CARD -->
+    <div class="bg-slate-950 border border-slate-800 rounded-2xl p-6 sm:p-8 text-center relative overflow-hidden shadow-2xl">
+      <div class="absolute inset-0 bg-gradient-to-b from-emerald-500/5 to-transparent pointer-events-none"></div>
+      
+      <p class="text-xs sm:text-sm font-semibold uppercase tracking-widest text-slate-400 mb-1">
+        Local On-Device Execution Latency
+      </p>
+
+      <!-- Big Latency Number -->
+      <div class="my-3 flex items-baseline justify-center gap-2">
+        <span id="latency-val" class="text-5xl sm:text-7xl font-black tracking-tight text-slate-300">
+          --
+        </span>
+        <span id="latency-unit" class="text-2xl sm:text-3xl font-bold text-slate-500">
+          ms
+        </span>
+      </div>
+
+      <div id="latency-badge" class="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1 rounded-full bg-slate-800 text-slate-400 border border-slate-700">
+        Awaiting input image
+      </div>
+
+      <!-- Quick Metrics Strip -->
+      <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-6 pt-6 border-t border-slate-800/80 text-left text-xs">
+        <div class="bg-slate-900/80 p-2.5 rounded-lg border border-slate-800">
+          <span class="text-slate-400 block text-[11px]">Inference Mode</span>
+          <span class="font-semibold text-slate-200">100% Local WASM</span>
+        </div>
+        <div class="bg-slate-900/80 p-2.5 rounded-lg border border-slate-800">
+          <span class="text-slate-400 block text-[11px]">Landmarks Detected</span>
+          <span id="metric-landmarks" class="font-semibold text-slate-200">--</span>
+        </div>
+        <div class="bg-slate-900/80 p-2.5 rounded-lg border border-slate-800">
+          <span class="text-slate-400 block text-[11px]">Chin-to-Crown Ratio</span>
+          <span id="metric-ratio" class="font-semibold text-slate-200">--</span>
+        </div>
+        <div class="bg-slate-900/80 p-2.5 rounded-lg border border-slate-800">
+          <span class="text-slate-400 block text-[11px]">Total Runs</span>
+          <span id="metric-runs" class="font-semibold text-slate-200">0</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- CONTROLS & UPLOAD -->
+    <div class="bg-slate-950 border border-slate-800 rounded-xl p-5 sm:p-6 space-y-4 shadow-lg">
+      <div class="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+        <div>
+          <h2 class="font-bold text-white text-base">Select Test Image</h2>
+          <p class="text-xs text-slate-400">Upload any photo or camera selfie to run live MediaPipe inference</p>
+        </div>
+
+        <div class="flex items-center gap-2">
+          <button id="sample-btn" type="button" class="px-3.5 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-slate-200 border border-slate-700 transition-colors flex items-center gap-1.5 disabled:opacity-50">
+            <span>⚡ Use Sample Portrait</span>
+          </button>
+          <button id="rerun-btn" type="button" class="px-3.5 py-2 rounded-lg bg-emerald-700 hover:bg-emerald-600 text-xs font-semibold text-white transition-colors flex items-center gap-1.5 disabled:opacity-50" disabled>
+            <span>🔄 Re-run (Warm Cache)</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- File Dropzone Input -->
+      <label class="block relative border-2 border-dashed border-slate-700 hover:border-emerald-500 rounded-xl p-6 text-center cursor-pointer transition-colors bg-slate-900/50">
+        <input type="file" id="file-input" accept="image/*" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer" disabled>
+        <div class="space-y-2 pointer-events-none">
+          <div class="w-10 h-10 rounded-full bg-slate-800 text-emerald-400 mx-auto flex items-center justify-center text-lg">
+            📷
+          </div>
+          <p class="text-sm font-semibold text-slate-200">
+            Click to take a photo or select an image
+          </p>
+          <p class="text-xs text-slate-500">
+            All computation runs locally on your device's GPU/CPU. Zero server uploads.
+          </p>
+        </div>
+      </label>
+    </div>
+
+    <!-- CANVAS VIEWPORT -->
+    <div class="bg-slate-950 border border-slate-800 rounded-xl p-4 sm:p-6 shadow-lg text-center space-y-3">
+      <div class="flex items-center justify-between text-xs text-slate-400 pb-2 border-b border-slate-800">
+        <span class="font-semibold text-slate-300">Biometric Mesh Visualization</span>
+        <span id="canvas-dims" class="font-mono">Ready</span>
+      </div>
+
+      <div class="relative inline-block mx-auto max-w-full rounded-lg overflow-hidden border border-slate-800 bg-slate-900">
+        <canvas id="output-canvas" class="max-w-full h-auto block mx-auto"></canvas>
+        <div id="canvas-placeholder" class="py-24 px-8 text-slate-500 text-sm">
+          Canvas preview will display your photo with 478 face landmarks, chin anchor, and crown boundary.
+        </div>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- Footer -->
+  <footer class="bg-slate-950 border-t border-slate-800 py-4 px-4 text-center text-xs text-slate-500">
+    <div class="max-w-4xl mx-auto space-y-1">
+      <p class="font-mono text-slate-400">
+        @mediapipe/tasks-vision v0.10.14 • Float16 FaceLandmarker Model
+      </p>
+      <p class="text-[11px] text-slate-600">
+        FormReady Mobile Validation Suite • Gate 2 Local CV Benchmark
+      </p>
+    </div>
+  </footer>
+
+  <!-- MEDIAPIPE BENCHMARK LOGIC -->
+  <script type="module">
+    import {
+      FilesetResolver,
+      FaceLandmarker
+    } from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14";
+
+    // DOM References
+    const engineBadge = document.getElementById('engine-status-badge');
+    const engineText = document.getElementById('engine-status-text');
+    const latencyVal = document.getElementById('latency-val');
+    const latencyBadge = document.getElementById('latency-badge');
+    const metricLandmarks = document.getElementById('metric-landmarks');
+    const metricRatio = document.getElementById('metric-ratio');
+    const metricRuns = document.getElementById('metric-runs');
+    const fileInput = document.getElementById('file-input');
+    const sampleBtn = document.getElementById('sample-btn');
+    const rerunBtn = document.getElementById('rerun-btn');
+    const outputCanvas = document.getElementById('output-canvas');
+    const canvasPlaceholder = document.getElementById('canvas-placeholder');
+    const canvasDims = document.getElementById('canvas-dims');
+    const ctx = outputCanvas.getContext('2d');
+
+    let faceLandmarker = null;
+    let currentImageElement = null;
+    let runCount = 0;
+
+    // 1. Initialize MediaPipe Face Landmarker
+    async function initMediaPipe() {
+      try {
+        engineText.textContent = "Loading WASM runtime...";
+        const filesetResolver = await FilesetResolver.forVisionTasks(
+          "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm"
+        );
+
+        engineText.textContent = "Loading model asset (float16)...";
+        faceLandmarker = await FaceLandmarker.createFromOptions(filesetResolver, {
+          baseOptions: {
+            modelAssetPath: "https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task",
+            delegate: "GPU"
+          },
+          runningMode: "IMAGE",
+          numFaces: 1,
+          outputFaceBlendshapes: false,
+          outputFacialTransformationMatrixes: false
+        });
+
+        // Ready state
+        engineBadge.className = "flex items-center gap-2 text-xs font-medium px-3 py-1.5 rounded-full bg-emerald-950/80 border border-emerald-600/70 text-emerald-300";
+        engineBadge.querySelector('span').className = "w-2 h-2 rounded-full bg-emerald-400";
+        engineText.textContent = "✓ Model Ready (Local GPU/WASM)";
+        
+        fileInput.disabled = false;
+        sampleBtn.disabled = false;
+        latencyBadge.textContent = "Ready to benchmark. Select a photo.";
+      } catch (err) {
+        console.error("MediaPipe initialization error:", err);
+        engineBadge.className = "flex items-center gap-2 text-xs font-medium px-3 py-1.5 rounded-full bg-red-950 border border-red-700 text-red-300";
+        engineText.textContent = "Initialization Failed";
+        latencyBadge.textContent = "Error: " + err.message;
+      }
+    }
+
+    // 2. Benchmark Function: Wrap .detect() in performance.now()
+    function runBenchmarkOnImage(img) {
+      if (!faceLandmarker) return;
+
+      currentImageElement = img;
+      canvasPlaceholder.classList.add('hidden');
+
+      // Set canvas dimensions to match image (capped at max 800px width for optimal UI)
+      const maxDim = 800;
+      let width = img.naturalWidth || img.width;
+      let height = img.naturalHeight || img.height;
+      if (width > maxDim || height > maxDim) {
+        if (width > height) {
+          height = Math.round((height * maxDim) / width);
+          width = maxDim;
+        } else {
+          width = Math.round((width * maxDim) / height);
+          height = maxDim;
+        }
+      }
+
+      outputCanvas.width = width;
+      outputCanvas.height = height;
+      canvasDims.textContent = `${width} × ${height} px`;
+
+      // Draw initial image
+      ctx.drawImage(img, 0, 0, width, height);
+
+      // --- CRITICAL BENCHMARK SECTION ---
+      const t0 = performance.now();
+      const landmarkerResult = faceLandmarker.detect(outputCanvas);
+      const t1 = performance.now();
+      const latency = t1 - t0;
+      // ----------------------------------
+
+      runCount++;
+      metricRuns.textContent = runCount;
+
+      // Update Latency Display
+      const latencyMs = latency.toFixed(1);
+      latencyVal.textContent = latencyMs;
+      console.log(`[FormReady Benchmark] Inference Time: ${latencyMs} ms`);
+
+      // Color-code latency
+      if (latency < 250) {
+        latencyVal.className = "text-5xl sm:text-7xl font-black tracking-tight text-emerald-400 glow-green";
+        latencyBadge.className = "inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1 rounded-full bg-emerald-950 text-emerald-300 border border-emerald-700";
+        latencyBadge.textContent = `✓ Blazing Fast (${latencyMs} ms) — Sub-250ms Target Met`;
+      } else if (latency < 800) {
+        latencyVal.className = "text-5xl sm:text-7xl font-black tracking-tight text-teal-400";
+        latencyBadge.className = "inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1 rounded-full bg-teal-950 text-teal-300 border border-teal-700";
+        latencyBadge.textContent = `✓ Excellent (${latencyMs} ms) — Sub-800ms Budget Met`;
+      } else if (latency < 1500) {
+        latencyVal.className = "text-5xl sm:text-7xl font-black tracking-tight text-amber-400";
+        latencyBadge.className = "inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1 rounded-full bg-amber-950 text-amber-300 border border-amber-700";
+        latencyBadge.textContent = `⚠️ Acceptable (${latencyMs} ms) — Below 1500ms Gate Limit`;
+      } else {
+        latencyVal.className = "text-5xl sm:text-7xl font-black tracking-tight text-red-400";
+        latencyBadge.className = "inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1 rounded-full bg-red-950 text-red-300 border border-red-700";
+        latencyBadge.textContent = `✕ Slow (${latencyMs} ms) — Exceeds 1500ms Target`;
+      }
+
+      // Draw Landmarks & Biometric Measurements
+      if (landmarkerResult && landmarkerResult.faceLandmarks && landmarkerResult.faceLandmarks.length > 0) {
+        const landmarks = landmarkerResult.faceLandmarks[0];
+        metricLandmarks.textContent = `${landmarks.length} pts (1 Face)`;
+
+        // Draw mesh dots
+        ctx.fillStyle = 'rgba(52, 211, 153, 0.65)'; // emerald
+        for (let i = 0; i < landmarks.length; i++) {
+          const pt = landmarks[i];
+          const x = pt.x * width;
+          const y = pt.y * height;
+          ctx.beginPath();
+          ctx.arc(x, y, 1.2, 0, Math.PI * 2);
+          ctx.fill();
+        }
+
+        // Biometric DS-160 Landmarks
+        // 10: Forehead/hairline, 152: Chin bottom
+        const crown = landmarks[10];
+        const chin = landmarks[152];
+        const chinY = chin.y * height;
+        const crownY = crown.y * height;
+        const headHeightPx = Math.abs(chinY - crownY);
+        const ratioPercent = ((headHeightPx / height) * 100).toFixed(1);
+
+        metricRatio.textContent = `${ratioPercent}% of frame`;
+
+        // Draw Chin Line
+        ctx.strokeStyle = '#ef4444';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(chin.x * width - 40, chinY);
+        ctx.lineTo(chin.x * width + 40, chinY);
+        ctx.stroke();
+
+        ctx.fillStyle = '#ef4444';
+        ctx.font = '10px monospace';
+        ctx.fillText(`Chin: ${(chin.y * 100).toFixed(1)}%`, chin.x * width + 45, chinY + 3);
+
+        // Draw Crown Line
+        ctx.strokeStyle = '#3b82f6';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(crown.x * width - 40, crownY);
+        ctx.lineTo(crown.x * width + 40, crownY);
+        ctx.stroke();
+
+        ctx.fillStyle = '#60a5fa';
+        ctx.fillText(`Crown: ${(crown.y * 100).toFixed(1)}%`, crown.x * width + 45, crownY + 3);
+
+        // Height bracket
+        ctx.strokeStyle = '#f59e0b';
+        ctx.lineWidth = 1.5;
+        ctx.setLineDash([4, 4]);
+        ctx.beginPath();
+        ctx.moveTo(chin.x * width - 30, crownY);
+        ctx.lineTo(chin.x * width - 30, chinY);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.fillStyle = '#fcd34d';
+        ctx.fillText(`Head: ${ratioPercent}%`, chin.x * width - 90, (chinY + crownY) / 2);
+
+      } else {
+        metricLandmarks.textContent = "0 (No face detected)";
+        metricRatio.textContent = "N/A";
+      }
+
+      rerunBtn.disabled = false;
+    }
+
+    // 3. User File Upload Handling
+    fileInput.addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const img = new Image();
+        img.onload = () => runBenchmarkOnImage(img);
+        img.src = event.target.result;
+      };
+      reader.readAsDataURL(file);
+    });
+
+    // 4. Sample Portrait Generator (For instant testing without uploading files)
+    sampleBtn.addEventListener('click', () => {
+      // Create sample portrait on in-memory canvas
+      const sampleCanvas = document.createElement('canvas');
+      sampleCanvas.width = 600;
+      sampleCanvas.height = 600;
+      const sCtx = sampleCanvas.getContext('2d');
+
+      // Realistic biometric portrait simulation
+      sCtx.fillStyle = '#f8fafc';
+      sCtx.fillRect(0, 0, 600, 600);
+
+      // Torso
+      sCtx.fillStyle = '#1e293b';
+      sCtx.beginPath();
+      sCtx.ellipse(300, 560, 200, 120, 0, 0, Math.PI * 2);
+      sCtx.fill();
+
+      // Neck
+      sCtx.fillStyle = '#e2a784';
+      sCtx.fillRect(270, 360, 60, 90);
+
+      // Head
+      sCtx.fillStyle = '#f6be9b';
+      sCtx.beginPath();
+      sCtx.ellipse(300, 260, 115, 155, 0, 0, Math.PI * 2);
+      sCtx.fill();
+
+      // Hair
+      sCtx.fillStyle = '#1e1b18';
+      sCtx.beginPath();
+      sCtx.arc(300, 220, 122, Math.PI * 0.9, Math.PI * 2.1);
+      sCtx.fill();
+
+      // Eyes
+      sCtx.fillStyle = '#0f172a';
+      sCtx.beginPath();
+      sCtx.arc(260, 250, 7, 0, Math.PI * 2);
+      sCtx.arc(340, 250, 7, 0, Math.PI * 2);
+      sCtx.fill();
+
+      // Eyebrows
+      sCtx.strokeStyle = '#1e1b18';
+      sCtx.lineWidth = 3.5;
+      sCtx.beginPath();
+      sCtx.moveTo(245, 235); sCtx.lineTo(275, 235);
+      sCtx.moveTo(325, 235); sCtx.lineTo(355, 235);
+      sCtx.stroke();
+
+      // Nose
+      sCtx.strokeStyle = '#c48967';
+      sCtx.lineWidth = 2.5;
+      sCtx.beginPath();
+      sCtx.moveTo(300, 255); sCtx.lineTo(294, 285); sCtx.lineTo(306, 285);
+      sCtx.stroke();
+
+      // Mouth
+      sCtx.strokeStyle = '#9f5845';
+      sCtx.lineWidth = 3.5;
+      sCtx.beginPath();
+      sCtx.moveTo(280, 330); sCtx.lineTo(320, 330);
+      sCtx.stroke();
+
+      const img = new Image();
+      img.onload = () => runBenchmarkOnImage(img);
+      img.src = sampleCanvas.toDataURL('image/jpeg', 0.95);
+    });
+
+    // 5. Re-run button for warm-cache latency testing
+    rerunBtn.addEventListener('click', () => {
+      if (currentImageElement) {
+        runBenchmarkOnImage(currentImageElement);
+      }
+    });
+
+    // Initialize on load
+    initMediaPipe();
+  </script>
+</body>
+</html>
