@@ -3,160 +3,150 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>FormReady — On-Device MediaPipe Face Landmarker Benchmark</title>
-  <meta name="description" content="Local on-device inference latency benchmark for Google MediaPipe Face Landmarker. Evaluates client-side execution for FormReady's biometric compliance engine.">
+  <title>FormReady — On-Device Face Landmarker Benchmark</title>
+  <meta name="description" content="Minimalist local on-device inference latency benchmark for Google MediaPipe Face Landmarker.">
   <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <style>
-    .glow-green {
-      box-shadow: 0 0 25px rgba(16, 185, 129, 0.35);
-    }
+    body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; }
   </style>
 </head>
-<body class="bg-slate-900 text-slate-100 min-h-screen flex flex-col font-sans antialiased">
+<body class="bg-white text-slate-900 min-h-screen flex flex-col antialiased selection:bg-slate-200 selection:text-slate-900">
 
-  <!-- Header -->
-  <header class="bg-slate-950 border-b border-slate-800 py-4 px-4 sm:px-6">
-    <div class="max-w-4xl mx-auto flex items-center justify-between">
-      <div class="flex items-center gap-3">
-        <div class="w-9 h-9 rounded bg-emerald-600 text-slate-950 flex items-center justify-center font-black text-lg shadow-sm">
-          CV
-        </div>
-        <div>
-          <h1 class="font-bold text-base sm:text-lg text-white tracking-tight flex items-center gap-2">
-            FormReady
-            <span class="text-[10px] font-semibold bg-emerald-950 text-emerald-400 border border-emerald-800 px-1.5 py-0.5 rounded uppercase">
-              Gate 2 Benchmark
-            </span>
-          </h1>
-          <p class="text-xs text-slate-400">MediaPipe Face Landmarker • Client-Side WASM Latency</p>
-        </div>
+  <!-- Minimal Top Bar -->
+  <header class="border-b border-slate-200/80 bg-white sticky top-0 z-30">
+    <div class="max-w-3xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between">
+      <div class="flex items-center gap-2.5">
+        <span class="font-bold text-sm tracking-tight text-slate-900">FormReady</span>
+        <span class="text-slate-300">/</span>
+        <span class="text-xs text-slate-500 font-medium">CV Benchmark</span>
       </div>
-      <div id="engine-status-badge" class="flex items-center gap-2 text-xs font-medium px-3 py-1.5 rounded-full bg-amber-950/60 border border-amber-700/60 text-amber-300">
-        <span class="w-2 h-2 rounded-full bg-amber-400 animate-pulse"></span>
-        <span id="engine-status-text">Initializing WASM...</span>
+      
+      <!-- Minimalist Engine Status Pill -->
+      <div id="engine-status-badge" class="inline-flex items-center gap-1.5 text-xs text-slate-600 bg-slate-100 border border-slate-200 px-2.5 py-1 rounded-full font-medium">
+        <span id="engine-status-dot" class="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse"></span>
+        <span id="engine-status-text">Loading Model...</span>
       </div>
     </div>
   </header>
 
-  <!-- Main Content -->
-  <main class="flex-grow max-w-4xl mx-auto px-4 py-6 sm:py-8 w-full space-y-6">
+  <!-- Main Container -->
+  <main class="flex-grow max-w-3xl mx-auto px-4 sm:px-6 py-8 sm:py-12 w-full space-y-8">
 
-    <!-- PROMINENT LATENCY DISPLAY CARD -->
-    <div class="bg-slate-950 border border-slate-800 rounded-2xl p-6 sm:p-8 text-center relative overflow-hidden shadow-2xl">
-      <div class="absolute inset-0 bg-gradient-to-b from-emerald-500/5 to-transparent pointer-events-none"></div>
-      
-      <p class="text-xs sm:text-sm font-semibold uppercase tracking-widest text-slate-400 mb-1">
-        Local On-Device Execution Latency
+    <!-- HERO / PROMINENT LATENCY DISPLAY -->
+    <section class="text-center space-y-3">
+      <p class="text-xs font-semibold uppercase tracking-widest text-slate-400">
+        Local Execution Latency
       </p>
 
-      <!-- Big Latency Number -->
-      <div class="my-3 flex items-baseline justify-center gap-2">
-        <span id="latency-val" class="text-5xl sm:text-7xl font-black tracking-tight text-slate-300">
+      <!-- Latency Number -->
+      <div class="flex items-baseline justify-center gap-1.5 py-1">
+        <span id="latency-val" class="text-6xl sm:text-8xl font-bold tracking-tight text-slate-900 tabular-nums">
           --
         </span>
-        <span id="latency-unit" class="text-2xl sm:text-3xl font-bold text-slate-500">
+        <span id="latency-unit" class="text-xl sm:text-2xl font-medium text-slate-400">
           ms
         </span>
       </div>
 
-      <div id="latency-badge" class="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1 rounded-full bg-slate-800 text-slate-400 border border-slate-700">
-        Awaiting input image
+      <!-- Latency Feedback Badge -->
+      <div>
+        <span id="latency-badge" class="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1 rounded-full bg-slate-100 text-slate-600 border border-slate-200">
+          Awaiting input photo
+        </span>
       </div>
 
-      <!-- Quick Metrics Strip -->
-      <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-6 pt-6 border-t border-slate-800/80 text-left text-xs">
-        <div class="bg-slate-900/80 p-2.5 rounded-lg border border-slate-800">
-          <span class="text-slate-400 block text-[11px]">Inference Mode</span>
-          <span class="font-semibold text-slate-200">100% Local WASM</span>
+      <!-- Minimal Metrics Grid -->
+      <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5 pt-6 max-w-xl mx-auto text-left text-xs">
+        <div class="p-3 rounded-lg border border-slate-200 bg-slate-50/60">
+          <span class="text-slate-400 text-[11px] block">Runtime</span>
+          <span class="font-semibold text-slate-800">Local WASM</span>
         </div>
-        <div class="bg-slate-900/80 p-2.5 rounded-lg border border-slate-800">
-          <span class="text-slate-400 block text-[11px]">Landmarks Detected</span>
-          <span id="metric-landmarks" class="font-semibold text-slate-200">--</span>
+        <div class="p-3 rounded-lg border border-slate-200 bg-slate-50/60">
+          <span class="text-slate-400 text-[11px] block">Landmarks</span>
+          <span id="metric-landmarks" class="font-semibold text-slate-800">--</span>
         </div>
-        <div class="bg-slate-900/80 p-2.5 rounded-lg border border-slate-800">
-          <span class="text-slate-400 block text-[11px]">Chin-to-Crown Ratio</span>
-          <span id="metric-ratio" class="font-semibold text-slate-200">--</span>
+        <div class="p-3 rounded-lg border border-slate-200 bg-slate-50/60">
+          <span class="text-slate-400 text-[11px] block">Head Ratio</span>
+          <span id="metric-ratio" class="font-semibold text-slate-800">--</span>
         </div>
-        <div class="bg-slate-900/80 p-2.5 rounded-lg border border-slate-800">
-          <span class="text-slate-400 block text-[11px]">Total Runs</span>
-          <span id="metric-runs" class="font-semibold text-slate-200">0</span>
+        <div class="p-3 rounded-lg border border-slate-200 bg-slate-50/60">
+          <span class="text-slate-400 text-[11px] block">Test Iterations</span>
+          <span id="metric-runs" class="font-semibold text-slate-800">0</span>
         </div>
       </div>
-    </div>
+    </section>
 
-    <!-- CONTROLS & UPLOAD -->
-    <div class="bg-slate-950 border border-slate-800 rounded-xl p-5 sm:p-6 space-y-4 shadow-lg">
-      <div class="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
-        <div>
-          <h2 class="font-bold text-white text-base">Select Test Image</h2>
-          <p class="text-xs text-slate-400">Upload any photo or camera selfie to run live MediaPipe inference</p>
-        </div>
-
+    <!-- INPUT CONTROLS -->
+    <section class="space-y-3">
+      <div class="flex items-center justify-between">
+        <span class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Select Image</span>
         <div class="flex items-center gap-2">
-          <button id="sample-btn" type="button" class="px-3.5 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-slate-200 border border-slate-700 transition-colors flex items-center gap-1.5 disabled:opacity-50">
-            <span>⚡ Use Sample Portrait</span>
+          <button id="sample-btn" type="button" class="text-xs font-medium px-3 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 transition shadow-sm disabled:opacity-50" disabled>
+            ⚡ Sample Photo
           </button>
-          <button id="rerun-btn" type="button" class="px-3.5 py-2 rounded-lg bg-emerald-700 hover:bg-emerald-600 text-xs font-semibold text-white transition-colors flex items-center gap-1.5 disabled:opacity-50" disabled>
-            <span>🔄 Re-run (Warm Cache)</span>
+          <button id="rerun-btn" type="button" class="text-xs font-medium px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-white transition shadow-sm disabled:opacity-50" disabled>
+            🔄 Re-run
           </button>
         </div>
       </div>
 
-      <!-- File Dropzone Input -->
-      <label class="block relative border-2 border-dashed border-slate-700 hover:border-emerald-500 rounded-xl p-6 text-center cursor-pointer transition-colors bg-slate-900/50">
+      <!-- Minimalist File Dropzone -->
+      <label class="block relative border border-dashed border-slate-300 hover:border-slate-400 rounded-xl p-8 text-center cursor-pointer transition bg-slate-50/50 hover:bg-slate-50 group">
         <input type="file" id="file-input" accept="image/*" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer" disabled>
-        <div class="space-y-2 pointer-events-none">
-          <div class="w-10 h-10 rounded-full bg-slate-800 text-emerald-400 mx-auto flex items-center justify-center text-lg">
-            📷
+        <div class="space-y-1.5 pointer-events-none">
+          <div class="w-8 h-8 rounded-full bg-white border border-slate-200 text-slate-600 mx-auto flex items-center justify-center text-sm shadow-sm group-hover:scale-105 transition-transform">
+            ↑
           </div>
-          <p class="text-sm font-semibold text-slate-200">
-            Click to take a photo or select an image
+          <p class="text-sm font-medium text-slate-800">
+            Click to upload or drag an image here
           </p>
-          <p class="text-xs text-slate-500">
-            All computation runs locally on your device's GPU/CPU. Zero server uploads.
+          <p class="text-xs text-slate-400">
+            JPG, PNG or Camera selfie • 100% processed in local browser memory
           </p>
         </div>
       </label>
-    </div>
+    </section>
 
-    <!-- CANVAS VIEWPORT -->
-    <div class="bg-slate-950 border border-slate-800 rounded-xl p-4 sm:p-6 shadow-lg text-center space-y-3">
-      <div class="flex items-center justify-between text-xs text-slate-400 pb-2 border-b border-slate-800">
-        <span class="font-semibold text-slate-300">Biometric Mesh Visualization</span>
-        <span id="canvas-dims" class="font-mono">Ready</span>
+    <!-- VISUALIZATION CANVAS -->
+    <section class="space-y-2">
+      <div class="flex items-center justify-between text-xs text-slate-400">
+        <span class="font-medium text-slate-600">Landmark Mesh Output</span>
+        <span id="canvas-dims" class="font-mono text-[11px]"></span>
       </div>
 
-      <div class="relative inline-block mx-auto max-w-full rounded-lg overflow-hidden border border-slate-800 bg-slate-900">
-        <canvas id="output-canvas" class="max-w-full h-auto block mx-auto"></canvas>
-        <div id="canvas-placeholder" class="py-24 px-8 text-slate-500 text-sm">
-          Canvas preview will display your photo with 478 face landmarks, chin anchor, and crown boundary.
+      <div class="rounded-xl border border-slate-200 bg-slate-50/50 p-3 sm:p-4 flex items-center justify-center overflow-hidden">
+        <div class="relative max-w-full rounded-lg overflow-hidden bg-white border border-slate-200 shadow-sm">
+          <canvas id="output-canvas" class="max-w-full h-auto block mx-auto"></canvas>
+          <div id="canvas-placeholder" class="py-20 px-8 text-center text-slate-400 text-xs font-medium">
+            Upload a photo to visualize 478 face landmarks and biometric chin/crown boundaries.
+          </div>
         </div>
       </div>
-    </div>
+    </section>
 
   </main>
 
-  <!-- Footer -->
-  <footer class="bg-slate-950 border-t border-slate-800 py-4 px-4 text-center text-xs text-slate-500">
-    <div class="max-w-4xl mx-auto space-y-1">
-      <p class="font-mono text-slate-400">
-        @mediapipe/tasks-vision v0.10.14 • Float16 FaceLandmarker Model
-      </p>
-      <p class="text-[11px] text-slate-600">
-        FormReady Mobile Validation Suite • Gate 2 Local CV Benchmark
-      </p>
+  <!-- Minimal Footer -->
+  <footer class="border-t border-slate-200 py-6 text-center text-xs text-slate-400 mt-8">
+    <div class="max-w-3xl mx-auto px-4 space-y-1">
+      <p>Google MediaPipe Face Landmarker (Float16) • Client-Side WASM</p>
+      <p class="text-[11px] text-slate-400">Zero network telemetry. All biometric landmark calculations execute on-device.</p>
     </div>
   </footer>
 
-  <!-- MEDIAPIPE BENCHMARK LOGIC -->
+  <!-- BENCHMARK SCRIPT -->
   <script type="module">
     import {
       FilesetResolver,
       FaceLandmarker
     } from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14";
 
-    // DOM References
+    // DOM Elements
     const engineBadge = document.getElementById('engine-status-badge');
+    const engineDot = document.getElementById('engine-status-dot');
     const engineText = document.getElementById('engine-status-text');
     const latencyVal = document.getElementById('latency-val');
     const latencyBadge = document.getElementById('latency-badge');
@@ -178,12 +168,12 @@
     // 1. Initialize MediaPipe Face Landmarker
     async function initMediaPipe() {
       try {
-        engineText.textContent = "Loading WASM runtime...";
+        engineText.textContent = "Loading WASM...";
         const filesetResolver = await FilesetResolver.forVisionTasks(
           "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm"
         );
 
-        engineText.textContent = "Loading model asset (float16)...";
+        engineText.textContent = "Loading Model...";
         faceLandmarker = await FaceLandmarker.createFromOptions(filesetResolver, {
           baseOptions: {
             modelAssetPath: "https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task",
@@ -195,30 +185,31 @@
           outputFacialTransformationMatrixes: false
         });
 
-        // Ready state
-        engineBadge.className = "flex items-center gap-2 text-xs font-medium px-3 py-1.5 rounded-full bg-emerald-950/80 border border-emerald-600/70 text-emerald-300";
-        engineBadge.querySelector('span').className = "w-2 h-2 rounded-full bg-emerald-400";
-        engineText.textContent = "✓ Model Ready (Local GPU/WASM)";
+        // Ready state (clean minimal green indicator)
+        engineDot.className = "w-1.5 h-1.5 rounded-full bg-emerald-500";
+        engineBadge.className = "inline-flex items-center gap-1.5 text-xs text-emerald-800 bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-full font-medium";
+        engineText.textContent = "Ready";
         
         fileInput.disabled = false;
         sampleBtn.disabled = false;
-        latencyBadge.textContent = "Ready to benchmark. Select a photo.";
+        latencyBadge.textContent = "Ready. Select an image or click Sample.";
       } catch (err) {
-        console.error("MediaPipe initialization error:", err);
-        engineBadge.className = "flex items-center gap-2 text-xs font-medium px-3 py-1.5 rounded-full bg-red-950 border border-red-700 text-red-300";
-        engineText.textContent = "Initialization Failed";
-        latencyBadge.textContent = "Error: " + err.message;
+        console.error("Initialization error:", err);
+        engineDot.className = "w-1.5 h-1.5 rounded-full bg-red-500";
+        engineBadge.className = "inline-flex items-center gap-1.5 text-xs text-red-800 bg-red-50 border border-red-200 px-2.5 py-1 rounded-full font-medium";
+        engineText.textContent = "Error";
+        latencyBadge.textContent = "Failed to load model: " + err.message;
       }
     }
 
-    // 2. Benchmark Function: Wrap .detect() in performance.now()
+    // 2. Benchmark Execution
     function runBenchmarkOnImage(img) {
       if (!faceLandmarker) return;
 
       currentImageElement = img;
       canvasPlaceholder.classList.add('hidden');
 
-      // Set canvas dimensions to match image (capped at max 800px width for optimal UI)
+      // Constrain canvas dimensions for crisp high-density display
       const maxDim = 800;
       let width = img.naturalWidth || img.width;
       let height = img.naturalHeight || img.height;
@@ -236,61 +227,57 @@
       outputCanvas.height = height;
       canvasDims.textContent = `${width} × ${height} px`;
 
-      // Draw initial image
+      // Render image to canvas
       ctx.drawImage(img, 0, 0, width, height);
 
-      // --- CRITICAL BENCHMARK SECTION ---
+      // --- CRITICAL BENCHMARK TIMER ---
       const t0 = performance.now();
       const landmarkerResult = faceLandmarker.detect(outputCanvas);
       const t1 = performance.now();
       const latency = t1 - t0;
-      // ----------------------------------
+      // --------------------------------
 
       runCount++;
       metricRuns.textContent = runCount;
 
-      // Update Latency Display
       const latencyMs = latency.toFixed(1);
       latencyVal.textContent = latencyMs;
-      console.log(`[FormReady Benchmark] Inference Time: ${latencyMs} ms`);
+      console.log(`[FormReady Benchmark] Local Inference: ${latencyMs} ms`);
 
-      // Color-code latency
+      // Minimalist Latency Badging
       if (latency < 250) {
-        latencyVal.className = "text-5xl sm:text-7xl font-black tracking-tight text-emerald-400 glow-green";
-        latencyBadge.className = "inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1 rounded-full bg-emerald-950 text-emerald-300 border border-emerald-700";
-        latencyBadge.textContent = `✓ Blazing Fast (${latencyMs} ms) — Sub-250ms Target Met`;
+        latencyVal.className = "text-6xl sm:text-8xl font-bold tracking-tight text-emerald-600 tabular-nums";
+        latencyBadge.className = "inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200";
+        latencyBadge.textContent = `✓ Blazing Fast (${latencyMs} ms) • Sub-250ms target met`;
       } else if (latency < 800) {
-        latencyVal.className = "text-5xl sm:text-7xl font-black tracking-tight text-teal-400";
-        latencyBadge.className = "inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1 rounded-full bg-teal-950 text-teal-300 border border-teal-700";
-        latencyBadge.textContent = `✓ Excellent (${latencyMs} ms) — Sub-800ms Budget Met`;
+        latencyVal.className = "text-6xl sm:text-8xl font-bold tracking-tight text-slate-900 tabular-nums";
+        latencyBadge.className = "inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1 rounded-full bg-slate-100 text-slate-800 border border-slate-300";
+        latencyBadge.textContent = `✓ Excellent (${latencyMs} ms) • Sub-800ms target met`;
       } else if (latency < 1500) {
-        latencyVal.className = "text-5xl sm:text-7xl font-black tracking-tight text-amber-400";
-        latencyBadge.className = "inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1 rounded-full bg-amber-950 text-amber-300 border border-amber-700";
-        latencyBadge.textContent = `⚠️ Acceptable (${latencyMs} ms) — Below 1500ms Gate Limit`;
+        latencyVal.className = "text-6xl sm:text-8xl font-bold tracking-tight text-amber-600 tabular-nums";
+        latencyBadge.className = "inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1 rounded-full bg-amber-50 text-amber-800 border border-amber-200";
+        latencyBadge.textContent = `⚠️ Acceptable (${latencyMs} ms) • Under 1500ms budget`;
       } else {
-        latencyVal.className = "text-5xl sm:text-7xl font-black tracking-tight text-red-400";
-        latencyBadge.className = "inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1 rounded-full bg-red-950 text-red-300 border border-red-700";
-        latencyBadge.textContent = `✕ Slow (${latencyMs} ms) — Exceeds 1500ms Target`;
+        latencyVal.className = "text-6xl sm:text-8xl font-bold tracking-tight text-red-600 tabular-nums";
+        latencyBadge.className = "inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1 rounded-full bg-red-50 text-red-700 border border-red-200";
+        latencyBadge.textContent = `✕ Slow (${latencyMs} ms) • Exceeds 1500ms target`;
       }
 
-      // Draw Landmarks & Biometric Measurements
+      // Render Biometric Mesh & Visual Anchors
       if (landmarkerResult && landmarkerResult.faceLandmarks && landmarkerResult.faceLandmarks.length > 0) {
         const landmarks = landmarkerResult.faceLandmarks[0];
-        metricLandmarks.textContent = `${landmarks.length} pts (1 Face)`;
+        metricLandmarks.textContent = `${landmarks.length} pts`;
 
-        // Draw mesh dots
-        ctx.fillStyle = 'rgba(52, 211, 153, 0.65)'; // emerald
+        // Draw fine mesh dots
+        ctx.fillStyle = 'rgba(16, 185, 129, 0.7)'; // emerald
         for (let i = 0; i < landmarks.length; i++) {
           const pt = landmarks[i];
-          const x = pt.x * width;
-          const y = pt.y * height;
           ctx.beginPath();
-          ctx.arc(x, y, 1.2, 0, Math.PI * 2);
+          ctx.arc(pt.x * width, pt.y * height, 1.2, 0, Math.PI * 2);
           ctx.fill();
         }
 
-        // Biometric DS-160 Landmarks
-        // 10: Forehead/hairline, 152: Chin bottom
+        // Biometric chin (152) and crown/forehead (10)
         const crown = landmarks[10];
         const chin = landmarks[152];
         const chinY = chin.y * height;
@@ -298,52 +285,52 @@
         const headHeightPx = Math.abs(chinY - crownY);
         const ratioPercent = ((headHeightPx / height) * 100).toFixed(1);
 
-        metricRatio.textContent = `${ratioPercent}% of frame`;
+        metricRatio.textContent = `${ratioPercent}%`;
 
-        // Draw Chin Line
+        // Chin guide line (minimal red)
         ctx.strokeStyle = '#ef4444';
-        ctx.lineWidth = 2;
+        ctx.lineWidth = 1.5;
         ctx.beginPath();
         ctx.moveTo(chin.x * width - 40, chinY);
         ctx.lineTo(chin.x * width + 40, chinY);
         ctx.stroke();
 
         ctx.fillStyle = '#ef4444';
-        ctx.font = '10px monospace';
-        ctx.fillText(`Chin: ${(chin.y * 100).toFixed(1)}%`, chin.x * width + 45, chinY + 3);
+        ctx.font = '10px Inter, sans-serif';
+        ctx.fillText(`Chin ${(chin.y * 100).toFixed(1)}%`, chin.x * width + 45, chinY + 3);
 
-        // Draw Crown Line
+        // Crown guide line (minimal blue)
         ctx.strokeStyle = '#3b82f6';
-        ctx.lineWidth = 2;
+        ctx.lineWidth = 1.5;
         ctx.beginPath();
         ctx.moveTo(crown.x * width - 40, crownY);
         ctx.lineTo(crown.x * width + 40, crownY);
         ctx.stroke();
 
-        ctx.fillStyle = '#60a5fa';
-        ctx.fillText(`Crown: ${(crown.y * 100).toFixed(1)}%`, crown.x * width + 45, crownY + 3);
+        ctx.fillStyle = '#3b82f6';
+        ctx.fillText(`Crown ${(crown.y * 100).toFixed(1)}%`, crown.x * width + 45, crownY + 3);
 
-        // Height bracket
-        ctx.strokeStyle = '#f59e0b';
-        ctx.lineWidth = 1.5;
-        ctx.setLineDash([4, 4]);
+        // Subtle dashed height bracket
+        ctx.strokeStyle = '#94a3b8';
+        ctx.lineWidth = 1;
+        ctx.setLineDash([3, 3]);
         ctx.beginPath();
-        ctx.moveTo(chin.x * width - 30, crownY);
-        ctx.lineTo(chin.x * width - 30, chinY);
+        ctx.moveTo(chin.x * width - 25, crownY);
+        ctx.lineTo(chin.x * width - 25, chinY);
         ctx.stroke();
         ctx.setLineDash([]);
-        ctx.fillStyle = '#fcd34d';
-        ctx.fillText(`Head: ${ratioPercent}%`, chin.x * width - 90, (chinY + crownY) / 2);
+        ctx.fillStyle = '#64748b';
+        ctx.fillText(`${ratioPercent}%`, chin.x * width - 65, (chinY + crownY) / 2 + 3);
 
       } else {
-        metricLandmarks.textContent = "0 (No face detected)";
+        metricLandmarks.textContent = "0";
         metricRatio.textContent = "N/A";
       }
 
       rerunBtn.disabled = false;
     }
 
-    // 3. User File Upload Handling
+    // 3. User File Upload
     fileInput.addEventListener('change', (e) => {
       const file = e.target.files[0];
       if (!file) return;
@@ -357,20 +344,19 @@
       reader.readAsDataURL(file);
     });
 
-    // 4. Sample Portrait Generator (For instant testing without uploading files)
+    // 4. Clean Synthetic Portrait for Instant 1-Click Testing
     sampleBtn.addEventListener('click', () => {
-      // Create sample portrait on in-memory canvas
       const sampleCanvas = document.createElement('canvas');
       sampleCanvas.width = 600;
       sampleCanvas.height = 600;
       const sCtx = sampleCanvas.getContext('2d');
 
-      // Realistic biometric portrait simulation
+      // Minimalist portrait layout
       sCtx.fillStyle = '#f8fafc';
       sCtx.fillRect(0, 0, 600, 600);
 
-      // Torso
-      sCtx.fillStyle = '#1e293b';
+      // Shoulders
+      sCtx.fillStyle = '#334155';
       sCtx.beginPath();
       sCtx.ellipse(300, 560, 200, 120, 0, 0, Math.PI * 2);
       sCtx.fill();
@@ -386,7 +372,7 @@
       sCtx.fill();
 
       // Hair
-      sCtx.fillStyle = '#1e1b18';
+      sCtx.fillStyle = '#1e293b';
       sCtx.beginPath();
       sCtx.arc(300, 220, 122, Math.PI * 0.9, Math.PI * 2.1);
       sCtx.fill();
@@ -399,7 +385,7 @@
       sCtx.fill();
 
       // Eyebrows
-      sCtx.strokeStyle = '#1e1b18';
+      sCtx.strokeStyle = '#1e293b';
       sCtx.lineWidth = 3.5;
       sCtx.beginPath();
       sCtx.moveTo(245, 235); sCtx.lineTo(275, 235);
@@ -425,14 +411,14 @@
       img.src = sampleCanvas.toDataURL('image/jpeg', 0.95);
     });
 
-    // 5. Re-run button for warm-cache latency testing
+    // 5. Re-run Button
     rerunBtn.addEventListener('click', () => {
       if (currentImageElement) {
         runBenchmarkOnImage(currentImageElement);
       }
     });
 
-    // Initialize on load
+    // Start initialization
     initMediaPipe();
   </script>
 </body>
